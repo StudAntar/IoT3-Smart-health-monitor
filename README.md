@@ -12,7 +12,8 @@ Projektet bruger pytest, og CI kører automatisk tests på hver Pull Request.
 
 ## Tech stack
 - Python
+- C++
 - HTML/CSS/JS
-- PostgreSQL
+- SQL
 
 
