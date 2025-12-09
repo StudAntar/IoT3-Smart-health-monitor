@@ -31,4 +31,40 @@ def get_patients():
     return jsonify(data), 200
 
 
+@app.get("/patient/<int:pid>")
+@jwt_required()
+def get_patient(pid):
+    data = read_json()
+    for p in data:
+        if p.get("id") == pid:
+            return jsonify(p), 200
+    return jsonify({"error": "Patient not found"}), 404
 
+
+@app.post("/add_patient")
+@jwt_required()
+def add_patient():
+    new_patient = request.get_json()
+    data = read_json()
+
+    new_patient["id"] = len(data) + 1
+
+    data.append(new_patient)
+    write_json(data)
+
+    return jsonify({"message": "Patient added", "patient": new_patient}), 201
+
+@app.delete("/patient/<int:pid>")
+@jwt_required()
+def delete_patient(pid):
+    data = read_json()
+    new_data = [p for p in data if p.get("id") != pid]
+
+    if len(new_data) == len(data):
+        return jsonify({"error": "Patient not found"}), 404
+
+    write_json(new_data)
+    return jsonify({"message": "Patient deleted"}), 200
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
