@@ -24,5 +24,11 @@ def login():
     token = create_access_token(identity=username)
     return jsonify({"token": token}), 200
 
+@app.get("/patients")
+@jwt_required()
+def get_patients():
+    data = read_json()
+    return jsonify(data), 200
+
 
 
