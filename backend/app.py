@@ -16,7 +16,7 @@ jwt = JWTManager(app)
 def login():
     data = request.get_json()
     username = data.get("username")
-    password = data.get("password")s
+    password = data.get("password")
 
     if username != "SmartHealthTeam" or password != "Gruppe11B":
         return jsonify({"msg": "Invalid login"}), 401
