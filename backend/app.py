@@ -1,4 +1,5 @@
-from apiflask import APIFlask
+from apiflask import APIFlask, Schema
+from apiflask.fields import String, Integer, Float
 from flask import request, jsonify
 from flask_jwt_extended import (
     JWTManager, create_access_token,
@@ -9,15 +10,33 @@ from psycopg2 import Error
 
 app = APIFlask(__name__)
 
+app.config["DEVICE_TOKEN"] = "ESP_32"
 app.config["JWT_SECRET_KEY"] = "HEMMELIG_NOEGLE"
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False
 jwt = JWTManager(app)
+
+class LoginSchema(Schema):
+    username = String(required=True)
+    password = String(required=True)
+
+class PatientSchema(Schema):
+    name = String(required=True)
+    age = Integer(required=True)
+
+class MeasurementSchema(Schema):
+    patient_id         = Integer(required=True)
+    body_temperature   = Float(required=True)
+    heart_rate         = Integer(required=True)
+    spo2               = Integer(required=True)
+    battery_controller = Float(required=True)
+    battery_sensor     = Float(required=True)
+    battery_actuator   = Float(required=True)
 
 def get_connection():
     try:
         conn = psycopg2.connect(
             user="postgres",
-            password="1234",
+            password="Darbi1234",
             host="127.0.0.1",
             port="5432",
             database="laege_klinik"
@@ -29,16 +48,38 @@ def get_connection():
         return None
 
 @app.post("/login")
-def login():
-    data = request.json
-    username = data.get("username")
-    password = data.get("password")
+@app.input(LoginSchema)
+def login(json_data):
+    username = json_data["username"]
+    password = json_data["password"]
 
     if username != "SmartHealthTeam" or password != "Gruppe11B":
         return {"msg": "Invalid login"}, 401
 
     token = create_access_token(identity=username)
     return {"token": token}, 200
+
+@app.post("/add_patient")
+@jwt_required()
+@app.input(PatientSchema)
+def add_patient(json_data):
+    name = json_data["name"]
+    age = json_data["age"]
+
+    conn = get_connection()
+    if not conn:
+        return {"error": "DB connection failed"}, 500
+
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO patients (name, age) VALUES (%s, %s) RETURNING id;",
+        (name, age)
+    )
+    new_id = cur.fetchone()[0]
+    cur.close()
+    conn.close()
+
+    return {"message": "Patient added", "id": new_id}, 201
 
 @app.get("/patients")
 @jwt_required()
@@ -51,7 +92,10 @@ def get_patients():
     rows = cur.fetchall()
     cur.close()
     conn.close()
-    result = [{"id": r[0], "name": r[1], "age": r[2]} for r in rows]
+    result = [
+        {"id": r[0], "name": r[1], "age": r[2]}
+        for r in rows
+    ]
     return result, 200
 
 @app.get("/patient/<int:pid>")
@@ -69,25 +113,6 @@ def get_patient(pid):
         return {"error": "Patient not found"}, 404
     return {"id": row[0], "name": row[1], "age": row[2]}, 200
 
-@app.post("/add_patient")
-@jwt_required()
-def add_patient():
-    data = request.json
-    name = data.get("name")
-    age = data.get("age")
-
-    conn = get_connection()
-    if not conn:
-        return {"error": "DB connection failed"}, 500
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO patients (name, age) VALUES (%s, %s) RETURNING id;",
-        (name, age)
-    )
-    new_id = cur.fetchone()[0]
-    cur.close()
-    conn.close()
-    return {"message": "Patient added", "id": new_id}, 201
 
 @app.delete("/patient/<int:pid>")
 @jwt_required()
@@ -104,5 +129,150 @@ def delete_patient(pid):
         return {"error": "Patient not found"}, 404
     return {"message": "Patient deleted"}, 200
 
+@app.post("/api/measurements")
+@app.input(MeasurementSchema)
+def add_measurement(json_data):
+    # Simpel device-auth (kun styreenheden må sende)
+    device_token = request.headers.get("X-DEVICE-TOKEN")
+    if device_token != app.config["DEVICE_TOKEN"]:
+        return {"msg": "Invalid device token"}, 401
+
+    patient_id         = json_data["patient_id"]
+    body_temperature   = json_data["body_temperature"]
+    heart_rate         = json_data["heart_rate"]
+    spo2               = json_data["spo2"]
+    battery_controller = json_data["battery_controller"]
+    battery_sensor     = json_data["battery_sensor"]
+    battery_actuator   = json_data["battery_actuator"]
+
+    conn = get_connection()
+    if not conn:
+        return {"error": "DB connection failed"}, 500
+
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO measurements (
+            patient_id,
+            body_temperature,
+            heart_rate,
+            spo2,
+            battery_controller,
+            battery_sensor,
+            battery_actuator
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        RETURNING id, created_at;
+        """,
+        (
+            patient_id,
+            body_temperature,
+            heart_rate,
+            spo2,
+            battery_controller,
+            battery_sensor,
+            battery_actuator
+        )
+    )
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    return {
+        "message": "Measurement added",
+        "id": row[0],
+        "created_at": row[1].isoformat()
+    }, 201
+
+@app.get("/api/measurements")
+@jwt_required()
+def get_all_measurements():
+    conn = get_connection()
+    if not conn:
+        return {"error": "DB connection failed"}, 500
+
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT
+            id,
+            patient_id,
+            body_temperature,
+            heart_rate,
+            spo2,
+            battery_controller,
+            battery_sensor,
+            battery_actuator,
+            created_at
+        FROM measurements
+        ORDER BY created_at DESC;
+    """)
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    result = []
+    for r in rows:
+        result.append({
+            "id": r[0],
+            "patient_id": r[1],
+            "body_temperature": float(r[2]) if r[2] is not None else None,
+            "heart_rate": r[3],
+            "spo2": r[4],
+            "battery_controller": float(r[5]) if r[5] is not None else None,
+            "battery_sensor": float(r[6]) if r[6] is not None else None,
+            "battery_actuator": float(r[7]) if r[7] is not None else None,
+            "created_at": r[8].isoformat()
+        })
+
+    return result, 200
+
+
+
+@app.get("/api/measurements/<int:patient_id>")
+@jwt_required()
+def get_measurements_for_patient(patient_id):
+    conn = get_connection()
+    if not conn:
+        return {"error": "DB connection failed"}, 500
+
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT
+            id,
+            patient_id,
+            body_temperature,
+            heart_rate,
+            spo2,
+            battery_controller,
+            battery_sensor,
+            battery_actuator,
+            created_at
+        FROM measurements
+        WHERE patient_id = %s
+        ORDER BY created_at DESC;
+    """, (patient_id,))
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    result = []
+    for r in rows:
+        result.append({
+            "id": r[0],
+            "patient_id": r[1],
+            "body_temperature": float(r[2]) if r[2] is not None else None,
+            "heart_rate": r[3],
+            "spo2": r[4],
+            "battery_controller": float(r[5]) if r[5] is not None else None,
+            "battery_sensor": float(r[6]) if r[6] is not None else None,
+            "battery_actuator": float(r[7]) if r[7] is not None else None,
+            "created_at": r[8].isoformat()
+        })
+
+    return result, 200
+
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=True)
+
