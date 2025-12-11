@@ -7,6 +7,7 @@ from flask_jwt_extended import (
 )
 import psycopg2
 from psycopg2 import Error
+import re
 
 app = APIFlask(__name__)
 
@@ -15,6 +16,24 @@ app.config["JWT_SECRET_KEY"] = "HEMMELIG_NOEGLE"
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False
 jwt = JWTManager(app)
 
+CPR_PATTERN = re.compile(r"^\d{6}-?\d{4}$")
+
+
+def is_valid_cpr(cpr: str) -> bool:
+    """
+    Validerer at CPR-nummeret har formatet:
+    - DDMMYY-XXXX eller
+    - DDMMYYXXXX
+    """
+    if not isinstance(cpr, str):
+        return False
+
+    if not CPR_PATTERN.match(cpr):
+        return False
+
+    return True
+
+
 class LoginSchema(Schema):
     username = String(required=True)
     password = String(required=True)
@@ -22,15 +41,17 @@ class LoginSchema(Schema):
 class PatientSchema(Schema):
     name = String(required=True)
     age = Integer(required=True)
+    cpr_nummer = String(required=True)
 
 class MeasurementSchema(Schema):
-    patient_id         = Integer(required=True)
+    cpr_nummer         = String(required=True)
     body_temperature   = Float(required=True)
     heart_rate         = Integer(required=True)
     spo2               = Integer(required=True)
     battery_controller = Float(required=True)
     battery_sensor     = Float(required=True)
     battery_actuator   = Float(required=True)
+
 
 def get_connection():
     try:
@@ -65,21 +86,34 @@ def login(json_data):
 def add_patient(json_data):
     name = json_data["name"]
     age = json_data["age"]
+    cpr_nummer = json_data["cpr_nummer"]
+
+    # CPR-format tjek
+    if not is_valid_cpr(cpr_nummer):
+        return {"error": "Ugyldigt CPR-format"}, 400
 
     conn = get_connection()
     if not conn:
         return {"error": "DB connection failed"}, 500
 
     cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO patients (name, age) VALUES (%s, %s) RETURNING id;",
-        (name, age)
-    )
-    new_id = cur.fetchone()[0]
+    try:
+        cur.execute(
+            "INSERT INTO patients (name, age, cpr_nummer) VALUES (%s, %s, %s) RETURNING id;",
+            (name, age, cpr_nummer)
+        )
+        new_id = cur.fetchone()[0]
+    except Error as e:
+        cur.close()
+        conn.close()
+        # fx hvis CPR allerede findes
+        return {"error": f"DB error: {e}"}, 400
+
     cur.close()
     conn.close()
 
-    return {"message": "Patient added", "id": new_id}, 201
+    return {"message": "Patient added", "id": new_id, "cpr_nummer": cpr_nummer}, 201
+
 
 @app.get("/patients")
 @jwt_required()
@@ -88,12 +122,12 @@ def get_patients():
     if not conn:
         return {"error": "DB connection failed"}, 500
     cur = conn.cursor()
-    cur.execute("SELECT id, name, age FROM patients;")
+    cur.execute("SELECT id, name, age, cpr_nummer FROM patients;")
     rows = cur.fetchall()
     cur.close()
     conn.close()
     result = [
-        {"id": r[0], "name": r[1], "age": r[2]}
+        {"id": r[0], "name": r[1], "age": r[2], "cpr_nummer": r[3]}
         for r in rows
     ]
     return result, 200
@@ -105,13 +139,13 @@ def get_patient(pid):
     if not conn:
         return {"error": "DB connection failed"}, 500
     cur = conn.cursor()
-    cur.execute("SELECT id, name, age FROM patients WHERE id=%s;", (pid,))
+    cur.execute("SELECT id, name, age, cpr_nummer FROM patients WHERE id=%s;", (pid,))
     row = cur.fetchone()
     cur.close()
     conn.close()
     if not row:
         return {"error": "Patient not found"}, 404
-    return {"id": row[0], "name": row[1], "age": row[2]}, 200
+    return {"id": row[0], "name": row[1], "age": row[2], "cpr_nummer": row[3]}, 200
 
 
 @app.delete("/patient/<int:pid>")
@@ -137,7 +171,7 @@ def add_measurement(json_data):
     if device_token != app.config["DEVICE_TOKEN"]:
         return {"msg": "Invalid device token"}, 401
 
-    patient_id         = json_data["patient_id"]
+    cpr_nummer        = json_data["cpr_nummer"]
     body_temperature   = json_data["body_temperature"]
     heart_rate         = json_data["heart_rate"]
     spo2               = json_data["spo2"]
@@ -145,11 +179,30 @@ def add_measurement(json_data):
     battery_sensor     = json_data["battery_sensor"]
     battery_actuator   = json_data["battery_actuator"]
 
+    # CPR-format tjek
+    if not is_valid_cpr(cpr_nummer):
+        return {"error": "Ugyldigt CPR-format"}, 400
+
     conn = get_connection()
     if not conn:
         return {"error": "DB connection failed"}, 500
 
     cur = conn.cursor()
+
+    # Slå patient_id op via CPR
+    cur.execute(
+        "SELECT id FROM patients WHERE cpr_nummer = %s;",
+        (cpr_nummer,)
+    )
+    patient_row = cur.fetchone()
+    if not patient_row:
+        cur.close()
+        conn.close()
+        return {"error": "Patient med dette CPR findes ikke"}, 404
+
+    patient_id = patient_row[0]
+
+    # Indsæt måling på det fundne patient_id
     cur.execute(
         """
         INSERT INTO measurements (
@@ -181,7 +234,8 @@ def add_measurement(json_data):
     return {
         "message": "Measurement added",
         "id": row[0],
-        "created_at": row[1].isoformat()
+        "created_at": row[1].isoformat(),
+        "cpr_nummer": cpr_nummer
     }, 201
 
 @app.get("/api/measurements")
