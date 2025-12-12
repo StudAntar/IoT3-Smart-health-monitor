@@ -1,6 +1,6 @@
 from apiflask import APIFlask, Schema
 from apiflask.fields import String, Integer, Float
-from flask import request, jsonify, Flask, render_template
+from flask import render_template, request, redirect, url_for, session
 from flask_jwt_extended import (
     JWTManager, create_access_token,
     jwt_required
@@ -11,9 +11,12 @@ import re
 import plotly.graph_objects as go
 from plotly.io import to_html
 
+from functools import wraps
+
 
 app = APIFlask(__name__)
 
+app.secret_key = "9c8e4b3f7a1d0f0a8b6e3d4c5f9a2e7c1b4d8e6a0f3c2d9b7a6e5f4c3b2a1"
 app.config["DEVICE_TOKEN"] = "ESP_32"
 app.config["JWT_SECRET_KEY"] = "HEMMELIG_NOEGLE"
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = False
@@ -55,6 +58,13 @@ class MeasurementSchema(Schema):
     battery_sensor     = Float(required=True)
     battery_actuator   = Float(required=True)
 
+def web_login_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if "user" not in session:
+            return redirect(url_for("web_login"))
+        return fn(*args, **kwargs)
+    return wrapper
 
 def get_connection():
     try:
@@ -71,9 +81,9 @@ def get_connection():
         print("Fejl i DB:", e)
         return None
 
-@app.post("/login")
+@app.post("/api/login")
 @app.input(LoginSchema)
-def login(json_data):
+def api_login(json_data):
     username = json_data["username"]
     password = json_data["password"]
 
@@ -329,22 +339,27 @@ def get_measurements_for_patient(patient_id):
     return result, 200
 
 @app.route("/")
+@web_login_required
 def index():
     return render_template("index.html")
 
 @app.route("/hjem")
+@web_login_required
 def hjem():
     return render_template("hjem.html")
 
 @app.route("/patient")
+@web_login_required
 def patient():
     return render_template("patient.html")
 
 @app.route("/observation")
+@web_login_required
 def observation():
     return render_template("observation.html")
 
 @app.route("/dashboard")
+@web_login_required
 def dashboard():
     conn = get_connection()
     if not conn:
@@ -370,7 +385,7 @@ def dashboard():
     if not rows:
         return render_template("dashboard.html", error="No measurements yet")
 
-    # vend rækkefølgen så grafen går frem i tid
+    # Vend rækkefølgen så grafen går frem i tid
     rows = list(reversed(rows))
 
     times = [r[0] for r in rows]
@@ -381,7 +396,7 @@ def dashboard():
     latest = rows[-1]
     latest_data = {
         "cpr_nummer": latest[4],
-        "created_at": latest[0],
+        "created_at": latest[0].strftime("%Y-%m-%d %H:%M") if latest[0] else None,
         "body_temperature": float(latest[1]) if latest[1] is not None else None,
         "heart_rate": int(latest[2]) if latest[2] is not None else None,
         "spo2": int(latest[3]) if latest[3] is not None else None,
@@ -389,8 +404,8 @@ def dashboard():
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=times, y=temps, mode="lines+markers", name="Temperature (°C)"))
-    fig.add_trace(go.Scatter(x=times, y=hr, mode="lines+markers", name="Heart rate (bpm)"))
-    fig.add_trace(go.Scatter(x=times, y=spo2, mode="lines+markers", name="SpO2 (%)"))
+    fig.add_trace(go.Scatter(x=times, y=hr,    mode="lines+markers", name="Heart rate (bpm)"))
+    fig.add_trace(go.Scatter(x=times, y=spo2,  mode="lines+markers", name="SpO2 (%)"))
 
     fig.update_layout(
         title="Measurements (last 50)",
@@ -409,6 +424,26 @@ def dashboard():
     )
 
 
+@app.route("/login", methods=["GET", "POST"])
+def web_login():
+    if request.method == "POST":
+        username = request.form.get("username", "")
+        password = request.form.get("password", "")
+
+        # Samme credentials som dit API-login
+        if username != "SmartHealthTeam" or password != "Gruppe11B":
+            return render_template("web_login.html", error="Forkert brugernavn eller kodeord")
+
+        session["user"] = username
+        return redirect(url_for("index"))
+
+    return render_template("web_login.html")
+
+
+@app.route("/logout")
+def web_logout():
+    session.clear()
+    return redirect(url_for("web_login"))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
