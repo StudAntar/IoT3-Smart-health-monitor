@@ -10,13 +10,51 @@
 </head>
 
 <body>
+    <div id="tm-bg"></div>
+    <div id="tm-wrap">
+        <div class="tm-main-content">
+            <div class="container mt-5">
 
-    <div class="container mt-5">
-        <h1>Dashboard</h1>
-        <p style="color: black;">Her kan dashboard ses.</p>
+                <h1 class="mb-4">Dashboard</h1>
 
-        <a href="index.html">Tilbage til hovedmenu</a>
+                {# Fejlbesked (hvis DB fejler eller ingen data) #}
+                {% if error %}
+                    <div class="alert alert-danger">
+                        {{ error }}
+                    </div>
+                {% endif %}
+
+                {# Seneste måling #}
+                {% if latest %}
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title">Seneste måling</h5>
+                            <ul class="mb-0">
+                                <li><b>CPR:</b> {{ latest.cpr_nummer }}</li>
+                                <li><b>Tid:</b> {{ latest.created_at }}</li>
+                                <li><b>Temperatur:</b> {{ latest.body_temperature }} °C</li>
+                                <li><b>Puls:</b> {{ latest.heart_rate }} bpm</li>
+                                <li><b>SpO2:</b> {{ latest.spo2 }} %</li>
+                            </ul>
+                        </div>
+                    </div>
+                {% endif %}
+
+                {# Plotly graf #}
+                {% if graph_html %}
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title">Målinger (seneste 50)</h5>
+                            <div>
+                                {{ graph_html | safe }}
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <a class="btn btn-secondary" href="{{ url_for('index') }}">Tilbage til hovedmenu</a>
+            </div>
+        </div>
     </div>
-
 </body>
 </html>
