@@ -1,22 +1,112 @@
 <!DOCTYPE html>
 <html lang="da">
+
 <head>
     <meta charset="UTF-8">
     <title>Patientoversigt</title>
 
-    <link rel="stylesheet" href="../css/bootstrap.min.css">
-    <link rel="stylesheet" href="../fontawesome/css/fontawesome-all.min.css">
-    <link rel="stylesheet" href="../css/tooplate-style.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='fontawesome/css/fontawesome-all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tooplate-style.css') }}">
+
+    <style>
+        .clinic-card {
+            background: rgba(0, 0, 0, 0.55);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #fff;
+        }
+
+        .clinic-table th,
+        .clinic-table td {
+            color: #fff !important;
+            border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
+        }
+    </style>
+
 </head>
 
 <body>
+    <div id="tm-bg"></div>
+    <div id="tm-wrap">
+        <div class="tm-main-content">
+            <div class="container mt-5">
 
-    <div class="container mt-5">
-        <h1>Patientoversigt</h1>
-        <p style="color: black;">Her kan du se en oversigt over alle registrerede patienter.</p>
+                <h1 class="mb-3">Patientoversigt</h1>
 
-        <a href="index.html">Tilbage til hovedmenu</a>
+                <!-- Intro (øverste 1/3) -->
+                <div class="card clinic-card mb-4">
+                    <div class="card-body">
+                        <p class="mb-2">
+                            Her får klinikken et samlet overblik over registrerede patienter og deres seneste målinger.
+                            Formålet er hurtig triage: hvem har nye data, hvem mangler data, og hvem bør tilses først.
+                        </p>
+                        <ul class="mb-0">
+                            <li><b>Seneste måling</b> viser tidspunktet for sidste registrering</li>
+                            <li><b>Status</b> vurderes ud fra seneste måling (Normal / Afvigelse / Ukendt)</li>
+                            <li><b>Se data</b> åbner dashboardet for den valgte patient</li>
+                        </ul>
+                    </div>
+                </div>
+
+                {% if error %}
+                <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+
+                <!-- Patienttabel -->
+                {% if patients %}
+                <div class="card clinic-card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title mb-3">Registrerede patienter</h5>
+
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0 clinic-table">
+                                <thead>
+                                    <tr>
+                                        <th>Navn</th>
+                                        <th>CPR</th>
+                                        <th>Alder</th>
+                                        <th>Seneste måling</th>
+                                        <th>Status</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for p in patients %}
+                                    <tr>
+                                        <td>{{ p.name }}</td>
+                                        <td>{{ p.cpr_nummer }}</td>
+                                        <td>{{ p.age }}</td>
+                                        <td>{{ p.latest_at if p.latest_at else "-" }}</td>
+                                        <td>
+                                            {% if p.status == "Normal" %}
+                                            <span class="badge badge-success">Normal</span>
+                                            {% elif p.status == "Afvigelse" %}
+                                            <span class="badge badge-danger">Afvigelse</span>
+                                            {% else %}
+                                            <span class="badge badge-secondary">Ukendt</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-right">
+                                            <a class="btn btn-sm btn-primary"
+                                                href="{{ url_for('dashboard', patient_id=p.id) }}">
+                                                Se data
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                    </div>
+                </div>
+                {% endif %}
+
+                <a class="btn btn-secondary" href="{{ url_for('index') }}">Tilbage til hovedmenu</a>
+
+            </div>
+        </div>
     </div>
-
 </body>
+
 </html>
