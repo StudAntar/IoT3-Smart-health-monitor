@@ -8,6 +8,9 @@ from flask_jwt_extended import (
 import psycopg2
 from psycopg2 import Error
 import re
+import plotly.graph_objects as go
+from plotly.io import to_html
+
 from functools import wraps
 
 
@@ -358,8 +361,149 @@ def observation():
 @app.route("/dashboard")
 @web_login_required
 def dashboard():
-    return render_template("dashboard.html")
+    conn = get_connection()
+    if not conn:
+        return render_template("dashboard.html", error="DB connection failed")
 
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT
+            m.created_at,
+            m.body_temperature,
+            m.heart_rate,
+            m.spo2,
+            p.cpr_nummer
+        FROM measurements m
+        JOIN patients p ON p.id = m.patient_id
+        ORDER BY m.created_at DESC
+        LIMIT 50;
+    """)
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    if not rows:
+        return render_template("dashboard.html", error="No measurements yet")
+
+    # vend rækkefølgen så grafen går frem i tid
+    rows = list(reversed(rows))
+
+    times = [r[0] for r in rows]
+    temps = [float(r[1]) if r[1] is not None else None for r in rows]
+    hr    = [int(r[2]) if r[2] is not None else None for r in rows]
+    spo2  = [int(r[3]) if r[3] is not None else None for r in rows]
+
+    latest = rows[-1]
+    latest_data = {
+        "cpr_nummer": latest[4],
+        "created_at": latest[0],
+        "body_temperature": float(latest[1]) if latest[1] is not None else None,
+        "heart_rate": int(latest[2]) if latest[2] is not None else None,
+        "spo2": int(latest[3]) if latest[3] is not None else None,
+    }
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=times, y=temps, mode="lines+markers", name="Temperature (°C)"))
+    fig.add_trace(go.Scatter(x=times, y=hr, mode="lines+markers", name="Heart rate (bpm)"))
+    fig.add_trace(go.Scatter(x=times, y=spo2, mode="lines+markers", name="SpO2 (%)"))
+
+    fig.update_layout(
+        title="Measurements (last 50)",
+        xaxis_title="Time",
+        yaxis_title="Value",
+        margin=dict(l=30, r=30, t=50, b=30),
+        legend=dict(orientation="h")
+    )
+
+    graph_html = to_html(fig, full_html=False, include_plotlyjs="cdn")
+
+    return render_template(
+        "dashboard.html",
+        latest=latest_data,
+        graph_html=graph_html
+    )
+
+
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT
+            m.created_at,
+            m.body_temperature,
+            m.heart_rate,
+            m.spo2,
+            p.cpr_nummer
+        FROM measurements m
+        JOIN patients p ON p.id = m.patient_id
+        ORDER BY m.created_at DESC
+        LIMIT 50;
+    """)
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    if not rows:
+        return render_template("dashboard.html", error="No measurements yet")
+
+    # vend rækkefølgen så grafen går frem i tid
+    rows = list(reversed(rows))
+
+    times = [r[0] for r in rows]
+    temps = [float(r[1]) if r[1] is not None else None for r in rows]
+    hr    = [int(r[2]) if r[2] is not None else None for r in rows]
+    spo2  = [int(r[3]) if r[3] is not None else None for r in rows]
+
+    latest = rows[-1]
+    latest_data = {
+        "cpr_nummer": latest[4],
+        "created_at": latest[0],
+        "body_temperature": float(latest[1]) if latest[1] is not None else None,
+        "heart_rate": int(latest[2]) if latest[2] is not None else None,
+        "spo2": int(latest[3]) if latest[3] is not None else None,
+    }
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=times, y=temps, mode="lines+markers", name="Temperature (°C)"))
+    fig.add_trace(go.Scatter(x=times, y=hr, mode="lines+markers", name="Heart rate (bpm)"))
+    fig.add_trace(go.Scatter(x=times, y=spo2, mode="lines+markers", name="SpO2 (%)"))
+
+    fig.update_layout(
+        title="Measurements (last 50)",
+        xaxis_title="Time",
+        yaxis_title="Value",
+        margin=dict(l=30, r=30, t=50, b=30),
+        legend=dict(orientation="h")
+    )
+
+    graph_html = to_html(fig, full_html=False, include_plotlyjs="cdn")
+
+    return render_template(
+        "dashboard.html",
+        latest=latest_data,
+        graph_html=graph_html
+    )
+
+
+
+@app.route("/login", methods=["GET", "POST"])
+def web_login():
+    if request.method == "POST":
+        username = request.form.get("username", "")
+        password = request.form.get("password", "")
+
+        # Samme credentials som dit API-login
+        if username != "SmartHealthTeam" or password != "Gruppe11B":
+            return render_template("web_login.html", error="Forkert brugernavn eller kodeord")
+
+        session["user"] = username
+        return redirect(url_for("index"))
+
+    return render_template("web_login.html")
+
+
+@app.route("/logout")
+def web_logout():
+    session.clear()
+    return redirect(url_for("web_login"))
 
 @app.route("/login", methods=["GET", "POST"])
 def web_login():
