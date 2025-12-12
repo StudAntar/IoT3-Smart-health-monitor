@@ -351,26 +351,57 @@ def dashboard():
         return render_template("dashboard.html", error="DB connection failed")
 
     cur = conn.cursor()
+
+    # --- Dropdown: patienter ---
+    cur.execute("SELECT id, name, age, cpr_nummer FROM patients ORDER BY id ASC;")
+    patient_rows = cur.fetchall()
+    if not patient_rows:
+        cur.close()
+        conn.close()
+        return render_template("dashboard.html", error="No patients found")
+
+    patients = [{"id": p[0], "name": p[1], "age": p[2], "cpr_nummer": p[3]} for p in patient_rows]
+
+    selected_patient_id = request.args.get("patient_id", type=int)
+    if selected_patient_id is None:
+        selected_patient_id = patients[0]["id"]
+
+    valid_ids = {p["id"] for p in patients}
+    if selected_patient_id not in valid_ids:
+        selected_patient_id = patients[0]["id"]
+
+    # --- Målinger (last 50) for valgt patient ---
+    # VIGTIGT: her tager vi også batterier med til device-grafen
     cur.execute("""
         SELECT
             m.created_at,
             m.body_temperature,
             m.heart_rate,
             m.spo2,
+            m.battery_controller,
+            m.battery_sensor,
+            m.battery_actuator,
             p.cpr_nummer
         FROM measurements m
         JOIN patients p ON p.id = m.patient_id
+        WHERE m.patient_id = %s
         ORDER BY m.created_at DESC
         LIMIT 50;
-    """)
+    """, (selected_patient_id,))
     rows = cur.fetchall()
+
     cur.close()
     conn.close()
 
     if not rows:
-        return render_template("dashboard.html", error="No measurements yet")
+        return render_template(
+            "dashboard.html",
+            patients=patients,
+            selected_patient_id=selected_patient_id,
+            error="No measurements for selected patient yet"
+        )
 
-    # vend rækkefølgen så grafen går frem i tid
+    # frem i tid
     rows = list(reversed(rows))
 
     times = [r[0] for r in rows]
@@ -378,36 +409,95 @@ def dashboard():
     hr    = [int(r[2]) if r[2] is not None else None for r in rows]
     spo2  = [int(r[3]) if r[3] is not None else None for r in rows]
 
+    bat_ctrl = [float(r[4]) if r[4] is not None else None for r in rows]
+    bat_sens = [float(r[5]) if r[5] is not None else None for r in rows]
+    bat_act  = [float(r[6]) if r[6] is not None else None for r in rows]
+
     latest = rows[-1]
     latest_data = {
-        "cpr_nummer": latest[4],
-        "created_at": latest[0],
-        "body_temperature": float(latest[1]) if latest[1] is not None else None,
-        "heart_rate": int(latest[2]) if latest[2] is not None else None,
-        "spo2": int(latest[3]) if latest[3] is not None else None,
+    "cpr_nummer": latest[7],
+    "created_at": latest[0].strftime("%Y-%m-%d %H:%M"),
+    "body_temperature": float(latest[1]) if latest[1] is not None else None,
+    "heart_rate": int(latest[2]) if latest[2] is not None else None,
+    "spo2": int(latest[3]) if latest[3] is not None else None,
+    "battery_controller": float(latest[4]) if latest[4] is not None else None,
+    "battery_sensor": float(latest[5]) if latest[5] is not None else None,
+    "battery_actuator": float(latest[6]) if latest[6] is not None else None,
     }
 
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=times, y=temps, mode="lines+markers", name="Temperature (°C)"))
-    fig.add_trace(go.Scatter(x=times, y=hr, mode="lines+markers", name="Heart rate (bpm)"))
-    fig.add_trace(go.Scatter(x=times, y=spo2, mode="lines+markers", name="SpO2 (%)"))
 
-    fig.update_layout(
-        title="Measurements (last 50)",
-        xaxis_title="Time",
-        yaxis_title="Value",
-        margin=dict(l=30, r=30, t=50, b=30),
-        legend=dict(orientation="h")
+    x0, x1 = times[0], times[-1]
+
+    # =========================
+    # FIG 1: VITALS (medical)
+    # =========================
+    fig_vitals = go.Figure()
+
+    # “medical vibe”: let grøn zone for normal temp (36.1–37.5)
+    fig_vitals.add_shape(
+        type="rect", xref="x", yref="y",
+        x0=x0, x1=x1, y0=36.1, y1=37.5,
+        line=dict(width=0),
+        fillcolor="rgba(0, 200, 0, 0.10)",
+        layer="below"
     )
 
-    graph_html = to_html(fig, full_html=False, include_plotlyjs="cdn")
+    fig_vitals.add_trace(go.Scatter(x=times, y=temps, mode="lines+markers", name="Temperature (°C)"))
+    fig_vitals.add_trace(go.Scatter(x=times, y=hr,    mode="lines+markers", name="Heart rate (bpm)"))
+    fig_vitals.add_trace(go.Scatter(x=times, y=spo2,  mode="lines+markers", name="SpO2 (%)"))
+
+    fig_vitals.update_layout(
+    title="Vitals",
+    xaxis_title="Time",
+    yaxis_title="Value",
+    margin=dict(l=40, r=40, t=60, b=40),
+    legend=dict(
+        orientation="h",
+        y=-0.25,
+        x=0.5,
+        xanchor="center",
+        itemwidth=120
+    ),
+    height=380
+    )
+
+
+    # =========================
+    # FIG 2: DEVICE HEALTH (battery)
+    # =========================
+    # FIG 2: DEVICE HEALTH (simple bars)
+    fig_battery = go.Figure()
+
+    labels = ["Controller", "Sensor", "Actuator"]
+    values = [
+        latest_data["battery_controller"],
+        latest_data["battery_sensor"],
+        latest_data["battery_actuator"]
+    ]
+
+    fig_battery.add_trace(go.Bar(x=labels, y=values, name="Battery"))
+
+    fig_battery.update_layout(
+    title="Device Health",
+    xaxis_title="Device",
+    yaxis_title="Batteri (%)",
+    margin=dict(l=30, r=30, t=60, b=30),
+    height=350,
+    yaxis=dict(range=[0, 100])
+    )
+
+    # Kun include_plotlyjs én gang
+    vitals_html = to_html(fig_vitals, full_html=False, include_plotlyjs="cdn")
+    battery_html = to_html(fig_battery, full_html=False, include_plotlyjs=False)
 
     return render_template(
         "dashboard.html",
+        patients=patients,
+        selected_patient_id=selected_patient_id,
         latest=latest_data,
-        graph_html=graph_html
+        vitals_html=vitals_html,
+        battery_html=battery_html
     )
-
 
 
 if __name__ == "__main__":
