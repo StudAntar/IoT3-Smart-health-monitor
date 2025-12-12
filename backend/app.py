@@ -351,7 +351,64 @@ def hjem():
 @app.route("/patient")
 @web_login_required
 def patient():
-    return render_template("patient.html")
+    conn = get_connection()
+    if not conn:
+        return render_template("patient.html", error="DB connection failed")
+
+    cur = conn.cursor()
+
+    # Hent alle patienter
+    cur.execute("SELECT id, name, age, cpr_nummer FROM patients ORDER BY id ASC;")
+    patient_rows = cur.fetchall()
+
+    if not patient_rows:
+        cur.close()
+        conn.close()
+        return render_template("patient.html", error="No patients found", patients=[])
+
+    patients = []
+    for (pid, name, age, cpr_nummer) in patient_rows:
+        # seneste måling for patienten
+        cur.execute("""
+            SELECT created_at, body_temperature, heart_rate, spo2
+            FROM measurements
+            WHERE patient_id = %s
+            ORDER BY created_at DESC
+            LIMIT 1;
+        """, (pid,))
+        m = cur.fetchone()
+
+        latest_at = None
+        status = "Ukendt"
+
+        if m:
+            created_at, temp, hr, spo2 = m
+            latest_at = created_at.strftime("%Y-%m-%d %H:%M") if created_at else None
+
+            # Status-regler (B)
+            temp_bad = (temp is not None) and (temp < 36.1 or temp > 37.5)
+            spo2_bad = (spo2 is not None) and (spo2 < 95)
+            hr_bad = (hr is not None) and (hr < 50 or hr > 100)
+
+            if temp_bad or spo2_bad or hr_bad:
+                status = "Afvigelse"
+            else:
+                status = "Normal"
+
+        patients.append({
+            "id": pid,
+            "name": name,
+            "age": age,
+            "cpr_nummer": cpr_nummer,
+            "latest_at": latest_at,
+            "status": status
+        })
+
+    cur.close()
+    conn.close()
+
+    return render_template("patient.html", patients=patients)
+
 
 @app.route("/observation")
 @web_login_required
