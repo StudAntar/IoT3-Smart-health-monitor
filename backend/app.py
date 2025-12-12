@@ -1,6 +1,6 @@
 from apiflask import APIFlask, Schema
 from apiflask.fields import String, Integer, Float
-from flask import request, jsonify
+from flask import request, jsonify, Flask, render_template
 from flask_jwt_extended import (
     JWTManager, create_access_token,
     jwt_required
@@ -325,6 +325,25 @@ def get_measurements_for_patient(patient_id):
 
     return result, 200
 
+@app.route("/")
+def index():
+    return render_template("index.html")
+
+@app.route("/hjem")
+def hjem():
+    return render_template("hjem.html")
+
+@app.route("/patient")
+def patient():
+    return render_template("patient.html")
+
+@app.route("/observation")
+def observation():
+    return render_template("observation.html")
+
+@app.route("/dashboard")
+def dashboard():
+    return render_template("dashboard.html")
 
 
 if __name__ == "__main__":

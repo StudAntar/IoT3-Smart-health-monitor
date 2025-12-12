@@ -11,7 +11,7 @@ import machine
 # --------- KONFIG TIL WIFI & API ---------
 WIFI_SSID = "testnest"
 WIFI_PASSWORD = "AA12345678"
-API_URL = "http://192.168.137.1:5000/api/measurements"
+API_URL = "http://192.168.1.31:5000/api/measurements"
 DEVICE_TOKEN = "ESP_32"
 
 # ---------------- I2C SETUP ----------------
@@ -151,42 +151,37 @@ def upload_payload_to_api(payload):
 
 
 def finalize_results():
-    """
-    Samler temperatur, BPM, SpO2 og batteriniveauer til én pakke,
-    printer den, sender RESULTS_DONE til skærmen
-    OG sender derefter til Flask-API'en (hvorefter styreenheden genstarter).
-    """
     global last_temp_c, last_bpm, last_spo2
     global last_ctrl_batt, last_sensor_batt, last_actuator_batt
+    global e
 
     if last_temp_c is None or last_bpm is None or last_spo2 is None:
+        print("Mangler data endnu -> temp/bpm/spo2:", last_temp_c, last_bpm, last_spo2)
         return
 
     payload = {
-        "patient_id": 1,
-        "body_temperature": last_temp_c,
-        "heart_rate": last_bpm,
-        "spo2": last_spo2,
-        "battery_controller": last_ctrl_batt,
-        "battery_sensor": last_sensor_batt,
-        "battery_actuator": last_actuator_batt,
+        "cpr_nummer": "010203-1234",  # TEST-CPR, skal findes i patients.cpr_nummer
+        "body_temperature": float(last_temp_c),
+        "heart_rate": int(last_bpm),
+        "spo2": int(last_spo2),
+        "battery_controller": float(last_ctrl_batt) if last_ctrl_batt is not None else 0.0,
+        "battery_sensor": float(last_sensor_batt) if last_sensor_batt is not None else 0.0,
+        "battery_actuator": float(last_actuator_batt) if last_actuator_batt is not None else 0.0,
     }
 
-    print("### PAYLOAD TIL API (TEST) ###")
-    json_str = json.dumps(payload)
-    print(json_str)
-    print("################################")
+    print("### PAYLOAD TIL API ###")
+    print(json.dumps(payload))
+    print("######################")
 
-    # 1) Giv skærmen besked som før (mens ESP-NOW stadig kører på original kanal)
+    # 1) Sig til skærmen
     try:
         e.send(broadcast_mac, b"RESULTS_DONE")
         print("RESULTS_DONE broadcastet")
     except OSError as err:
         print("ESP-NOW fejl ved RESULTS_DONE:", err)
 
-    # 2) Upload til API (denne funktion genstarter styreenheden til sidst)
+    # 2) Upload til API
     upload_payload_to_api(payload)
-
 
 # ---------------- MAIN LOOP ----------------
 while True:

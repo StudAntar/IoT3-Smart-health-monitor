@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="da">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Smart Health Monitor</title>
+
+    <!-- load CSS -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='fontawesome/css/fontawesome-all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tooplate-style.css') }}">
+
+    <script>
+        document.documentElement.className = "js";
+        var supportsCssVars = function () {
+            var e, t = document.createElement("style");
+            return t.innerHTML = "root: { --tmp-var: bold; }",
+                document.head.appendChild(t),
+                e = !!(window.CSS && window.CSS.supports && window.CSS.supports("font-weight", "var(--tmp-var)")),
+                t.parentNode.removeChild(t),
+                e
+        };
+        supportsCssVars() || alert("Please view this in a modern browser such as latest version of Chrome or Microsoft Edge.");
+    </script>
+</head>
+
+<body>
+    <div id="tm-bg"></div>
+    <div id="tm-wrap">
+        <div class="tm-main-content">
+            <div class="container tm-site-header-container">
+                <div class="row">
+                    <div class="col-sm-12 col-md-6 col-lg-6 col-md-col-xl-6 mb-md-0 mb-sm-4 mb-4 tm-site-header-col">
+                        <div class="tm-site-header">
+                            <h1 class="mb-4">Smart Health Monitor</h1>
+                            <img src="{{ url_for('static', filename='img/underline.png') }}" class="img-fluid mb-4"
+                                alt="underline">
+                            <p>De nyeste opdateringer fra patienterne</p>
+                        </div>
+                    </div>
+
+                    <div class="col-sm-12 col-md-6 col-lg-6 col-xl-6">
+                        <div class="content">
+                            <div class="grid">
+
+                                <!-- HJEM -->
+                                <div class="grid__item" id="home-link">
+                                    <div class="product">
+                                        <a class="tm-nav-link" href="{{ url_for('hjem') }}">
+                                            <i class="fas fa-home fa-3x tm-nav-icon"></i>
+                                            <span class="tm-nav-text">Hjem</span>
+                                            <div class="product__bg"></div>
+                                        </a>
+
+                                        <!-- (Valgfrit) Hvis du vil beholde tekstboksen under, kan du lade den stå. -->
+                                        <div class="product__description">
+                                            <div class="row mb-3">
+                                                <div class="col-12">
+                                                    <h2 class="tm-page-title">Hjem</h2>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-sm-12 col-md-6 col-lg-6 col-xl-6">
+                                                    <img src="{{ url_for('static', filename='img/welcome-1.jpg') }}"
+                                                        class="img-fluid mb-3" alt="">
+                                                    <p>Velkommen til Smart Health Monitor. Herfra kan du navigere til
+                                                        patientoversigt, observation og dashboard.</p>
+                                                </div>
+                                                <div class="col-sm-12 col-md-6 col-lg-6 col-xl-6">
+                                                    <img src="{{ url_for('static', filename='img/welcome-2.jpg') }}"
+                                                        class="img-fluid" alt="">
+                                                    <p>Dashboardet viser målinger fra patienter, hentet fra databasen
+                                                        via API’et.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- PATIENTOVERSIGT -->
+                                <div class="grid__item" id="team-link">
+                                    <div class="product">
+                                        <a class="tm-nav-link" href="{{ url_for('patient') }}">
+                                            <i class="fas fa-users fa-3x tm-nav-icon"></i>
+                                            <span class="tm-nav-text">Patientoversigt</span>
+                                            <div class="product__bg"></div>
+                                        </a>
+
+                                        <div class="product__description">
+                                            <div class="p-sm-4 p-2">
+                                                <div class="row mb-3">
+                                                    <div class="col-12">
+                                                        <h2 class="tm-page-title">Patientoversigt</h2>
+                                                    </div>
+                                                </div>
+                                                <div class="row tm-reverse-sm">
+                                                    <div class="col-sm-12 col-md-8 col-lg-8 col-xl-8">
+                                                        <p class="mb-4">Her får klinikken et overblik over patienter og
+                                                            deres seneste målinger.</p>
+                                                        <p class="mb-5">Denne side kobles senere til data i databasen.
+                                                        </p>
+                                                    </div>
+                                                    <div
+                                                        class="col-sm-12 col-md-4 col-lg-4 col-xl-4 mb-lg-0 mb-sm-4 mb-4">
+                                                        <img src="{{ url_for('static', filename='img/team.jpg') }}"
+                                                            class="img-fluid" alt="">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- OBSERVATION -->
+                                <div class="grid__item">
+                                    <div class="product">
+                                        <a class="tm-nav-link" href="{{ url_for('observation') }}">
+                                            <i class="fas fa-handshake fa-3x tm-nav-icon"></i>
+                                            <span class="tm-nav-text">Observation</span>
+                                            <div class="product__bg"></div>
+                                        </a>
+
+                                        <div class="product__description">
+                                            <div class="p-sm-4 p-2">
+                                                <div class="row mb-3">
+                                                    <div class="col-12">
+                                                        <h2 class="tm-page-title">Observation</h2>
+                                                    </div>
+                                                </div>
+                                                <div class="row mb-3">
+                                                    <div class="col-12">
+                                                        <p>Her kan klinikken notere eller se observationer (fx
+                                                            afvigelser i målinger).</p>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Hvis du vil beholde gallery-looket -->
+                                                <div class="row">
+                                                    <div class="col-12">
+                                                        <div class="p-sm-4 p-2 tm-img-container">
+                                                            <div class="tm-img-slider" id="tmImgSlider">
+                                                                <a href="#" class="tm-slider-img-link"><img
+                                                                        src="{{ url_for('static', filename='img/gallery-img-01-tn.jpg') }}"
+                                                                        alt="" class="img-fluid tm-slider-img"></a>
+                                                                <a href="#" class="tm-slider-img-link"><img
+                                                                        src="{{ url_for('static', filename='img/gallery-img-02-tn.jpg') }}"
+                                                                        alt="" class="img-fluid tm-slider-img"></a>
+                                                                <a href="#" class="tm-slider-img-link"><img
+                                                                        src="{{ url_for('static', filename='img/gallery-img-03-tn.jpg') }}"
+                                                                        alt="" class="img-fluid tm-slider-img"></a>
+                                                                <a href="#" class="tm-slider-img-link"><img
+                                                                        src="{{ url_for('static', filename='img/gallery-img-04-tn.jpg') }}"
+                                                                        alt="" class="img-fluid tm-slider-img"></a>
+                                                                <a href="#" class="tm-slider-img-link"><img
+                                                                        src="{{ url_for('static', filename='img/gallery-img-05-tn.jpg') }}"
+                                                                        alt="" class="img-fluid tm-slider-img"></a>
+                                                                <a href="#" class="tm-slider-img-link"><img
+                                                                        src="{{ url_for('static', filename='img/gallery-img-06-tn.jpg') }}"
+                                                                        alt="" class="img-fluid tm-slider-img"></a>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- DASHBOARD -->
+                                <div class="grid__item">
+                                    <div class="product">
+                                        <a class="tm-nav-link" href="{{ url_for('dashboard') }}">
+                                            <i class="fas fa-comments fa-3x tm-nav-icon"></i>
+                                            <span class="tm-nav-text">Dashboard</span>
+                                            <div class="product__bg"></div>
+                                        </a>
+
+                                        <div class="product__description">
+                                            <div class="pt-sm-4 pb-sm-4 pl-sm-5 pr-sm-5 pt-2 pb-2 pl-3 pr-3">
+                                                <div class="row mb-3">
+                                                    <div class="col-12">
+                                                        <h2 class="tm-page-title">Dashboard</h2>
+                                                    </div>
+                                                </div>
+                                                <div class="row mb-4">
+                                                    <div class="col-12">
+                                                        <p>Her kommer dine Plotly-grafer ind (temperatur, puls, SpO2,
+                                                            batteri). Vi kobler den til databasen lige om lidt.</p>
+                                                    </div>
+                                                </div>
+                                                <div class="row">
+                                                    <div class="col-12">
+                                                        <a class="btn btn-primary tm-btn-submit"
+                                                            href="{{ url_for('dashboard') }}">Åbn dashboard</a>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <footer>
+                <p class="small tm-copyright-text">
+                    Copyright &copy; <span class="tm-current-year">2025</span> Smart Health Monitor.
+                </p>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Hvis du vil undgå JS helt, kan du slette ALT herunder.
+         MEN: Pop-template “popup/animation” er JS-baseret, så uden JS bliver det bare almindelige links (som vi gør her).
+    -->
+    <!-- load JS (valgfrit) -->
+    <!--
+    <script src="{{ url_for('static', filename='js/jquery-3.2.1.slim.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/anime.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    -->
+</body>
+
+</html>
