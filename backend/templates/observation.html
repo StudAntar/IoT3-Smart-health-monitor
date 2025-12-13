@@ -1,22 +1,55 @@
 <!DOCTYPE html>
 <html lang="da">
 <head>
-    <meta charset="UTF-8">
-    <title>observation</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Observation</title>
 
-    <link rel="stylesheet" href="../css/bootstrap.min.css">
-    <link rel="stylesheet" href="../fontawesome/css/fontawesome-all.min.css">
-    <link rel="stylesheet" href="../css/tooplate-style.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='fontawesome/css/fontawesome-all.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/tooplate-style.css') }}">
 </head>
 
 <body>
+  <div id="tm-bg"></div>
+  <div id="tm-wrap">
+    <div class="tm-main-content">
+      <div class="container tm-site-header-container">
+        <div class="row">
+          <div class="col-12 text-center">
+            <h1 class="mb-3">Observation</h1>
+            <img src="{{ url_for('static', filename='img/underline.png') }}" class="img-fluid mb-4" alt="underline">
 
-    <div class="container mt-5">
-        <h1>observation</h1>
-        <p style="color: black;">Her kan data observeres.</p>
+            <div class="mx-auto p-4" style="
+              max-width: 700px;
+              background: rgba(0,0,0,0.55);
+              border: 1px solid rgba(255,255,255,0.18);
+              border-radius: 8px;">
+              
+              <p class="mb-2" style="color: rgba(255,255,255,0.85);">
+                <strong>Coming soon…</strong>
+              </p>
 
-        <a href="index.html">Tilbage til hovedmenu</a>
+              <p class="mb-0" style="color: rgba(255,255,255,0.75);">
+                Observationer bliver her et samlet sted, hvor klinikken kan notere kommentarer til målinger og markere afvigelser.
+              </p>
+
+              <div class="mt-4">
+                <a class="btn btn-primary tm-btn-submit" href="{{ url_for('index') }}">Tilbage til hovedmenu</a>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <p class="small tm-copyright-text">
+          Copyright &copy; <span class="tm-current-year">2025</span> Smart Health Monitor.
+        </p>
+      </footer>
     </div>
-
+  </div>
 </body>
 </html>
