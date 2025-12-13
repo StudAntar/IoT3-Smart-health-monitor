@@ -11,7 +11,7 @@ import machine
 # --------- KONFIG TIL WIFI & API ---------
 WIFI_SSID = "testnest"
 WIFI_PASSWORD = "AA12345678"
-API_URL = "http://10.136.131.74:5000/api/measurements"
+API_URL = "http://10.136.130.22:5000/api/measurements"
 DEVICE_TOKEN = "ESP_32"
 
 # ---------------- I2C SETUP ----------------

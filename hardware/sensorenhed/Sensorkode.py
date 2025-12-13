@@ -3,8 +3,8 @@ from machine import I2C, Pin
 import network
 import espnow
 import time
-from max30102 import MAX30102
-from ina219 import INA219   # batterimåling
+from max301022 import MAX301022   # <-- RIGTIG DRIVER (har read_latest)
+from ina219 import INA219         # batterimåling
 
 # -------------------- I2C KONFIG --------------------
 I2C_SCL = 22
@@ -67,16 +67,33 @@ def measure_temperature_window(duration_ms=12000, interval_ms=200):
 
     return sum(samples) / len(samples)
 
-# -------------------- P/I MÅLING (MAX30102) --------------------
+# -------------------- P/I MÅLING (MAX301022) - STABIL FIFO VERSION --------------------
 SAMPLE_HZ = 20
-SAMPLE_INTERVAL = 1.0 / SAMPLE_HZ
-MEASURE_SECONDS = 20
+DT = 1.0 / SAMPLE_HZ
 
-ppg = MAX30102(i2c)
+FINGER_TH = 20000
+FINGER_STABLE_SEC = 1.0
+WARMUP_SEC = 2.0
+MEASURE_SECONDS = 23.0
+
+ppg = MAX301022(i2c)
+
+def ppg_get():
+    """
+    Returnerer altid (IR, RED) uanset om driveren leverer (red, ir) eller (ir, red).
+    MAX30102: IR er næsten altid større end RED når du har finger på.
+    """
+    a, b = ppg.read_fifo()
+
+    # vælg den største som IR
+    if a > b:
+        ir, red = a, b
+    else:
+        ir, red = b, a
+
+    return ir, red
 
 def detrend(signal, window):
-    if len(signal) < 2:
-        return [0] * len(signal)
     out = []
     for i in range(len(signal)):
         start = max(0, i - window + 1)
@@ -86,81 +103,151 @@ def detrend(signal, window):
 
 def find_peaks(signal, min_height, min_distance):
     peaks = []
-    for i in range(1, len(signal) - 1):
+    for i in range(1, len(signal)-1):
         if signal[i] > signal[i-1] and signal[i] > signal[i+1] and signal[i] >= min_height:
             if not peaks or (i - peaks[-1]) > min_distance:
                 peaks.append(i)
     return peaks
 
-def calc_bpm_from_peaks(peaks, duration_seconds):
-    if not peaks or duration_seconds <= 0:
-        return 0
-    beats = len(peaks)
-    bpm = int(beats * (60.0 / duration_seconds))
-    return bpm
+def median(vals):
+    if not vals:
+        return None
+    s = vals[:]
+    s.sort()
+    mid = len(s) // 2
+    if len(s) % 2 == 1:
+        return s[mid]
+    return 0.5 * (s[mid-1] + s[mid])
 
 def calc_spo2_from_buffers(ir_raw, red_raw, peaks, fs):
     R_vals = []
+    half = int(0.4 * fs)
+
     for p in peaks:
-        half = int(0.4 * fs)
         start = max(0, p - half)
         end = min(len(ir_raw) - 1, p + half)
+
         ir_seg = ir_raw[start:end+1]
         red_seg = red_raw[start:end+1]
-        if len(ir_seg) < 3 or len(red_seg) < 3:
+        if len(ir_seg) < 10:
             continue
+
         ac_ir = max(ir_seg) - min(ir_seg)
         ac_red = max(red_seg) - min(red_seg)
         dc_ir = sum(ir_seg) / len(ir_seg)
         dc_red = sum(red_seg) / len(red_seg)
-        if dc_ir <= 0 or dc_red <= 0 or ac_ir <= 0:
+
+        if dc_ir <= 0 or dc_red <= 0 or ac_ir <= 0 or ac_red <= 0:
             continue
+
+        # reject very weak pulsations (typisk for hårdt tryk / bevægelse)
+        if (ac_ir / dc_ir) < 0.002:
+            continue
+
         R = (ac_red / dc_red) / (ac_ir / dc_ir)
         R_vals.append(R)
+
     if not R_vals:
-        return 0
-    R_mean = sum(R_vals) / len(R_vals)
-    spo2 = -45.06 * R_mean * R_mean + 30.354 * R_mean + 94.845
-    spo2 = max(0, min(100, spo2))
-    return int(spo2)
+        return 0, 0, None
+
+    R_med = median(R_vals)
+    spo2 = -45.06 * (R_med ** 2) + 30.354 * R_med + 94.845
+    spo2 = int(max(0, min(100, spo2)))
+    return spo2, len(R_vals), R_med
+
+def wait_for_finger(timeout_sec=15):
+    print("Vent: laeg fingeren let og daek mod lys...")
+    stable = 0
+    need = int(FINGER_STABLE_SEC * SAMPLE_HZ)
+
+    t0 = time.time()
+    last = 0
+
+    while stable < need:
+        if time.time() - t0 > timeout_sec:
+            print("Finger timeout -> ingen stabil finger registreret.")
+            return False
+
+        try:
+            ir, red = ppg_get()
+        except Exception as e:
+            if time.time() - last > 0.5:
+                print("FIFO read fejl:", e)
+                last = time.time()
+            time.sleep(DT)
+            continue
+
+        if time.time() - last > 0.5:
+            print("IR:", ir, "RED:", red, "| stable:", stable, "/", need)
+            last = time.time()
+
+        if ir > FINGER_TH:
+            stable += 1
+        else:
+            stable = 0
+
+        time.sleep(DT)
+
+    print("Finger OK")
+    return True
 
 def measure_pi_once(seconds=MEASURE_SECONDS, fs=SAMPLE_HZ):
     print("Starter P/I-måling i", seconds, "sek...")
+
+    ok = wait_for_finger()
+    if not ok:
+        return None, None
+
+    # warmup
+    t0 = time.time()
+    while time.time() - t0 < WARMUP_SEC:
+        try:
+            _ = ppg_get()
+        except:
+            pass
+        time.sleep(DT)
+
+    # measure
     ir_raw = []
     red_raw = []
+    start = time.time()
 
-    start_t = time.time()
-    while time.time() - start_t < seconds:
+    while time.time() - start < seconds:
         try:
-            ir, red = ppg.read()
-        except Exception as e:
-            print("PPG read error:", e)
-            time.sleep(SAMPLE_INTERVAL)
-            continue
+            ir, red = ppg_get()
+            ir_raw.append(ir)
+            red_raw.append(red)
+        except:
+            pass
+        time.sleep(DT)
 
-        ir_raw.append(ir)
-        red_raw.append(red)
-        time.sleep(SAMPLE_INTERVAL)
-
-    if len(ir_raw) < 5:
+    if len(ir_raw) < 50:
         print("For få samples til P/I-beregning.")
         return None, None
 
-    duration = len(ir_raw) / fs if fs > 0 else seconds
-
     hp = detrend(ir_raw, window=int(fs * 0.75))
-    hp_max = max(hp)
-    hp_min = min(hp)
-    hp_range = hp_max - hp_min if (hp_max - hp_min) != 0 else 1
-    threshold = max((0.30 * hp_range), 1000)
-    min_distance = int(0.35 * fs)
+    mean_hp = sum(hp) / len(hp)
+    hp_abs = [abs(x - mean_hp) for x in hp]
 
-    peaks = find_peaks(hp, threshold, min_distance)
+    tmp = hp_abs[:]
+    tmp.sort()
+    p95 = tmp[int(0.95 * (len(tmp)-1))]
 
-    bpm = calc_bpm_from_peaks(peaks, duration)
-    spo2 = calc_spo2_from_buffers(ir_raw, red_raw, peaks, fs)
+    threshold = max(int(0.35 * p95), 200)
+    peaks = find_peaks(hp_abs, threshold, int(0.35 * fs))
 
-    print("P/I resultat – BPM:", bpm, "SpO2:", spo2)
+    if len(peaks) < 3:
+        print("For få peaks -> ustabil måling. Prøv igen.")
+        return None, None
+
+    bpm = int(len(peaks) * (60.0 / seconds))
+    spo2, beats_used, R_med = calc_spo2_from_buffers(ir_raw, red_raw, peaks, fs)
+
+    print("P/I resultat – BPM:", bpm, "SpO2:", spo2,
+          "| peaks:", len(peaks),
+          "| beats_used:", beats_used,
+          "| R_med:", (None if R_med is None else round(R_med, 3)))
+
     return bpm, spo2
 
 # ---------------- ESP-NOW SETUP ----------------
@@ -240,7 +327,7 @@ while True:
             print("Ignorerer BEGIN_P_I – P/I-måling er allerede i gang.")
             continue
         if pi_done_sent:
-            print("Ignorerer BEGIN_P_I – P/I-måling er allerede færdig.")
+            print("Ignorerer BEGIN_P_I – måling er allerede færdig.")
             continue
 
         pi_measuring = True
