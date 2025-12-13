@@ -8,13 +8,26 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='fontawesome/css/fontawesome-all.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tooplate-style.css') }}">
+
+    <style>
+        /* Dashboard er en lang side → start fra toppen */
+        .tm-main-content {
+            align-items: flex-start !important;
+        }
+
+        /* Sørg for at siden kan scrolle korrekt */
+        #tm-wrap {
+            overflow-y: auto;
+        }
+    </style>
+
 </head>
 
 <body>
     <div id="tm-bg"></div>
     <div id="tm-wrap">
         <div class="tm-main-content">
-            <div class="container mt-5">
+            <div class="container py-5">
 
                 <h1 class="mb-4">Dashboard</h1>
 
