@@ -586,6 +586,48 @@ def web_login():
 
     return render_template("web_login.html")
 
+@app.route("/create_patient", methods=["POST"])
+@web_login_required
+def create_patient():
+    name = request.form.get("name", "").strip()
+    age = request.form.get("age", type=int)
+    cpr_nummer = request.form.get("cpr_nummer", "").strip()
+
+    # CPR Regex-validering (brug din eksisterende funktion!)
+    if not is_valid_cpr(cpr_nummer):
+        return render_template(
+            "patient.html",
+            error="Ugyldigt CPR-format"
+        )
+
+    conn = get_connection()
+    if not conn:
+        return render_template(
+            "patient.html",
+            error="Databaseforbindelse fejlede"
+        )
+
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            INSERT INTO patients (name, age, cpr_nummer)
+            VALUES (%s, %s, %s);
+            """,
+            (name, age, cpr_nummer)
+        )
+    except Exception as e:
+        cur.close()
+        conn.close()
+        return render_template(
+            "patient.html",
+            error="Patient med dette CPR findes allerede"
+        )
+
+    cur.close()
+    conn.close()
+
+    return redirect(url_for("patient"))
 
 @app.route("/logout")
 def web_logout():
