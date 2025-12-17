@@ -7,7 +7,6 @@
 
     <title>Smart Health Monitor</title>
 
-    <!-- load CSS -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='fontawesome/css/fontawesome-all.min.css') }}">
@@ -50,7 +49,6 @@
                         <div class="content">
                             <div class="grid">
 
-                                <!-- HJEM -->
                                 <div class="grid__item" id="home-link">
                                     <div class="product">
                                         <a class="tm-nav-link" href="{{ url_for('index') }}">
@@ -60,7 +58,6 @@
                                         </a>
 
 
-                                        <!-- (Valgfrit) Hvis du vil beholde tekstboksen under, kan du lade den stå. -->
                                         <div class="product__description">
                                             <div class="row mb-3">
                                                 <div class="col-12">
@@ -85,7 +82,6 @@
                                     </div>
                                 </div>
 
-                                <!-- PATIENTOVERSIGT -->
                                 <div class="grid__item" id="team-link">
                                     <div class="product">
                                         <a class="tm-nav-link" href="{{ url_for('patient') }}">
@@ -119,7 +115,6 @@
                                     </div>
                                 </div>
 
-                                <!-- OBSERVATION -->
                                 <div class="grid__item">
                                     <div class="product">
                                         <a class="tm-nav-link" href="{{ url_for('observation') }}">
@@ -142,7 +137,6 @@
                                                     </div>
                                                 </div>
 
-                                                <!-- Hvis du vil beholde gallery-looket -->
                                                 <div class="row">
                                                     <div class="col-12">
                                                         <div class="p-sm-4 p-2 tm-img-container">
@@ -175,7 +169,6 @@
                                     </div>
                                 </div>
 
-                                <!-- DASHBOARD -->
                                 <div class="grid__item">
                                     <div class="product">
                                         <a class="tm-nav-link" href="{{ url_for('dashboard') }}">
@@ -222,10 +215,7 @@
         </div>
     </div>
 
-    <!-- Hvis du vil undgå JS helt, kan du slette ALT herunder.
-         MEN: Pop-template “popup/animation” er JS-baseret, så uden JS bliver det bare almindelige links (som vi gør her).
-    -->
-    <!-- load JS (valgfrit) -->
+   
     <!--
     <script src="{{ url_for('static', filename='js/jquery-3.2.1.slim.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/anime.min.js') }}"></script>
