@@ -2,9 +2,8 @@ from machine import Pin, I2C
 import network
 import espnow
 import time
-from ina219 import INA219   # batterimåling
+from ina219 import INA219   
 
-# ---------------- I2C + BATTERI (INA219) ----------------
 I2C_SCL = 22
 I2C_SDA = 21
 
@@ -30,7 +29,6 @@ def read_battery_percent():
         print("Fejl ved batterimåling:", e)
         return None
 
-# ---------------- GPIO KONFIG ----------------
 VIB_PIN = 5    # GPIO til vibrationsmotor (via transistor)
 SOL_PIN = 27   # GPIO til solenoid (via transistor)
 
@@ -40,7 +38,6 @@ sol = Pin(SOL_PIN, Pin.OUT)
 vib.value(0)
 sol.value(0)
 
-# ---------------- ESP-NOW SETUP ----------------
 w0 = network.WLAN(network.STA_IF)
 w0.active(True)
 w0.disconnect()
@@ -53,7 +50,6 @@ e.add_peer(controller_mac)
 
 print("Aktuatorenhed klar – venter på PUSH_VIB...")
 
-# ---------------- HJÆLPEFUNKTIONER ----------------
 def do_vibration_and_solenoid():
     print("Starter vibration i 2 sek...")
     vib.value(1)
@@ -70,7 +66,6 @@ def do_vibration_and_solenoid():
     print("Solenoid deaktiveret.")
 
 
-# ---------------- MAIN LOOP ----------------
 while True:
     host, msg = e.recv()  # blocking
     print("ESP-NOW modtaget:", host, msg)
