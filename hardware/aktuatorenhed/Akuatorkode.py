@@ -29,8 +29,8 @@ def read_battery_percent():
         print("Fejl ved batterimåling:", e)
         return None
 
-VIB_PIN = 5    # GPIO til vibrationsmotor (via transistor)
-SOL_PIN = 27   # GPIO til solenoid (via transistor)
+VIB_PIN = 5    
+SOL_PIN = 27   
 
 vib = Pin(VIB_PIN, Pin.OUT)
 sol = Pin(SOL_PIN, Pin.OUT)
@@ -61,13 +61,13 @@ def do_vibration_and_solenoid():
 
     print("Aktiverer solenoid...")
     sol.value(1)
-    time.sleep(0.7)   # justér efter behov
+    time.sleep(0.7)   
     sol.value(0)
     print("Solenoid deaktiveret.")
 
 
 while True:
-    host, msg = e.recv()  # blocking
+    host, msg = e.recv() 
     print("ESP-NOW modtaget:", host, msg)
 
     if msg and b"PUSH_VIB" in msg:
@@ -77,14 +77,12 @@ while True:
 
         batt_pct = read_battery_percent()
 
-        # 1) P_I_READY som før
         try:
             e.send(controller_mac, b"P_I_READY")
             print("P_I_READY sendt til styreenhed")
         except OSError as err:
             print("Fejl ved send af P_I_READY:", err)
 
-        # 2) BATTERY:<pct>
         if batt_pct is not None:
             batt_payload = "BATTERY:{:.1f}".format(batt_pct)
             try:
