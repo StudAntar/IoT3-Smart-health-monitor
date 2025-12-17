@@ -1,4 +1,3 @@
-# -------- SENSOR-ENHED: Temp (MAX30205) + P/I (MAX30102) + BATTERI (INA219) --------
 from machine import I2C, Pin
 import network
 import espnow
@@ -7,15 +6,12 @@ from max30102 import MAX30102
 from max301022 import MAX301022
 from ina219 import INA219   # batterimåling
 
-# -------------------- I2C KONFIG --------------------
 I2C_SCL = 22
 I2C_SDA = 21
-TEMP_ADDR = 0x48   # MAX30205
-
+TEMP_ADDR = 0x48   
 i2c = I2C(0, scl=Pin(I2C_SCL), sda=Pin(I2C_SDA))
 print("I2C scan:", [hex(x) for x in i2c.scan()])
 
-# -------------------- BATTERI SENSOR (INA219) --------------------
 battery = INA219(i2c)
 
 def constrain(value, min_val, max_val):
@@ -37,7 +33,6 @@ def read_battery_percent():
         print("Fejl ved batterimåling:", e)
         return None
 
-# -------------------- TEMP LÆSNING (MAX30205) --------------------
 def read_temp():
     try:
         i2c.writeto(TEMP_ADDR, b'\x00')
@@ -45,7 +40,7 @@ def read_temp():
         raw = (data[0] << 8) | data[1]
         if raw & 0x8000:
             raw -= 1 << 16
-        return raw / 256.0 + 64.0   # kalibrering
+        return raw / 256.0 + 64.0  
     except Exception as e:
         print("Temp read error:", e)
         return None
@@ -68,7 +63,6 @@ def measure_temperature_window(duration_ms=12000, interval_ms=200):
 
     return sum(samples) / len(samples)
 
-# -------------------- P/I MÅLING (MAX301022) --------------------
 SAMPLE_HZ = 20
 DT = 1.0 / SAMPLE_HZ
 
@@ -143,10 +137,8 @@ def calc_spo2_from_buffers(ir_raw, red_raw, peaks):
 
     R_med = median(R_vals)
 
-    # 🔧 KALIBRERET SpO2-MAPPING (DET DU MANGLEDE)
     spo2 = 110 - 25 * R_med
 
-    # clamp til realistisk område
     spo2 = int(max(95, min(100, spo2)))
 
     return spo2
@@ -176,7 +168,6 @@ def measure_pi_once():
     if not wait_for_finger():
         return None, None
 
-    # Warmup
     t0 = time.time()
     while time.time() - t0 < WARMUP_SEC:
         ppg_get()
@@ -201,9 +192,8 @@ def measure_pi_once():
     p90 = tmp[int(0.90 * len(tmp))]
 
     threshold = max(int(p90 * 0.25), 150)
-    min_distance = int(0.6 / DT)   # ~1 peak pr. hjerteslag
-
-
+    min_distance = int(0.6 / DT)  
+    
     peaks = find_peaks(hp_abs, threshold, min_distance)
 
     if len(peaks) < 4:
@@ -214,7 +204,7 @@ def measure_pi_once():
 
     print("P/I resultat – BPM:", bpm, "SpO2:", spo2, "| peaks:", len(peaks))
     return bpm, spo2
-# ---------------- ESP-NOW SETUP ----------------
+
 w0 = network.WLAN(network.STA_IF)
 w0.active(True)
 w0.disconnect()
@@ -227,15 +217,13 @@ e.add_peer(controller_mac)
 
 print("Sensor-enhed klar – venter på BEGIN_TEMP / BEGIN_P_I...")
 
-# Flags til temperatur
+
 temp_measuring = False
 temp_done_sent = False
 
-# Flags til P/I
 pi_measuring = False
 pi_done_sent = False
 
-# -------------------- MAIN LOOP --------------------
 while True:
     host, msg = e.recv()
     print("ESP-NOW modtaget:", host, msg)
@@ -243,7 +231,6 @@ while True:
     if not msg:
         continue
 
-    # --------- TEMPERATURDEL ---------
     if b"BEGIN_TEMP" in msg:
         if temp_measuring:
             print("Ignorerer BEGIN_TEMP – måling er allerede i gang.")
@@ -264,7 +251,6 @@ while True:
 
         print("Kropstemperatur (gennemsnit):", round(temp_c, 2), "°C")
 
-        # Batteri
         batt_pct = read_battery_percent()
 
         payload = "TEMP_DONE:{:.2f}".format(temp_c)
@@ -285,7 +271,6 @@ while True:
         temp_measuring = False
         temp_done_sent = True
 
-    # --------- PULS / SpO2 DEL ---------
     elif b"BEGIN_P_I" in msg:
         if pi_measuring:
             print("Ignorerer BEGIN_P_I – P/I-måling er allerede i gang.")
