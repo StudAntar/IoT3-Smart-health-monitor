@@ -1,6 +1,4 @@
 
-# Working MicroPython driver for VL53L0X (simplified)
-# Tested on ESP32 + Thonny
 
 import time
 from machine import I2C
