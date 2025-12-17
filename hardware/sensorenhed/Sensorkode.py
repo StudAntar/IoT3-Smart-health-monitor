@@ -68,7 +68,7 @@ def measure_temperature_window(duration_ms=12000, interval_ms=200):
 
     return sum(samples) / len(samples)
 
-# -------------------- P/I MÅLING (MAX301022) – STABIL & KORREKT --------------------
+# -------------------- P/I MÅLING (MAX301022) --------------------
 SAMPLE_HZ = 20
 DT = 1.0 / SAMPLE_HZ
 
