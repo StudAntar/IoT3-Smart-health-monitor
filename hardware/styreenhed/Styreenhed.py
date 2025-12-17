@@ -59,7 +59,7 @@ def get_battery_percentage_from_voltage(voltage):
     percent = 100.0 * (voltage - min_voltage) / (max_voltage - min_voltage)
     return constrain(percent, 0, 100)
 
-# ---------------- ESP-NOW SETUP (SAMME SOM DA DET VIRKEDE) ----------------
+# ---------------- ESP-NOW SETUP----------------
 w0 = network.WLAN(network.STA_IF)
 w0.active(True)
 w0.disconnect()              # så den ikke hænger på WiFi
