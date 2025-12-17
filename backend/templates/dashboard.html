@@ -10,12 +10,10 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tooplate-style.css') }}">
 
     <style>
-        /* Dashboard er en lang side → start fra toppen */
         .tm-main-content {
             align-items: flex-start !important;
         }
 
-        /* Sørg for at siden kan scrolle korrekt */
         #tm-wrap {
             overflow-y: auto;
         }
@@ -31,7 +29,6 @@
 
                 <h1 class="mb-4">Dashboard</h1>
 
-                <!-- Dropdown -->
                 {% if patients %}
                 <form method="get" action="{{ url_for('dashboard') }}" class="mb-4" style="max-width: 420px;">
                     <label for="patient_id" class="form-label"><b>Vælg patient:</b></label>
@@ -45,12 +42,10 @@
                 </form>
                 {% endif %}
 
-                <!-- Fejl -->
                 {% if error %}
                 <div class="alert alert-danger">{{ error }}</div>
                 {% endif %}
 
-                <!-- Seneste måling -->
                 {% if latest %}
                 <div class="card mb-4">
                     <div class="card-body text-dark">
@@ -70,7 +65,6 @@
                 </div>
                 {% endif %}
 
-                <!-- Graf 1: Vitals -->
                 {% if vitals_html %}
                 <div class="card mb-4">
                     <div class="card-body">
@@ -80,7 +74,6 @@
                 </div>
                 {% endif %}
 
-                <!-- Graf 2: Battery bars -->
                 {% if battery_html %}
                 <div class="card mb-4">
                     <div class="card-body">
